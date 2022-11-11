@@ -33,8 +33,12 @@ for locale in AVAILABLE_LOCALES:
         if provider == "faker.providers":
             continue
         prov_cls, _, _ = Factory._find_provider_class(provider, locale)
-        members = {name: (prov_cls, locale, value) for (name, value) in inspect.getmembers(prov_cls) if not name.startswith("_")}
+        members = {name: (prov_cls, locale, value) for (name, value) in inspect.getmembers(prov_cls) 
+                   if not name.startswith("_")}
         unique_members.update(members)
+faker_members = {name: (faker.Faker, None, value) for (name, value) in inspect.getmembers(faker.Faker) 
+                 if not name.startswith("_")}
+unique_members.update(faker_members)
 
 imports = defaultdict(set)
 imports["typing"] = {"TypeVar"}
@@ -44,7 +48,9 @@ for name, (prov_cls, locale, value) in unique_members.items():
     attr = getattr(prov_cls, name, None)
     if attr is not None and inspect.isfunction(attr) or inspect.ismethod(attr):
         sig = inspect.signature(value)
-        if sig.return_annotation is not inspect.Signature.empty and sig.return_annotation.__module__ != "builtins":
+        if (sig.return_annotation is not None 
+            and sig.return_annotation is not inspect.Signature.empty 
+            and sig.return_annotation.__module__ != "builtins"):
             module, member = get_module_and_member(sig.return_annotation)
             if module is not None and member is not None:
                 imports[module].add(member)
@@ -53,7 +59,8 @@ for name, (prov_cls, locale, value) in unique_members.items():
             new_parm = parm_val
             if parm_val.default is not inspect.Parameter.empty:
                 new_parm = parm_val.replace(default=...)
-            if new_parm.annotation is not inspect.Parameter.empty and new_parm.annotation.__module__ != "builtins":
+            if (new_parm.annotation is not inspect.Parameter.empty 
+                and new_parm.annotation.__module__ != "builtins"):
                 module, member = get_module_and_member(new_parm.annotation)
                 if module is not None and member is not None:
                     imports[module].add(member)
