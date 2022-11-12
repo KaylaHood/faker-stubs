@@ -52,7 +52,7 @@ imports["typing"] = {"TypeVar"}
 imports["enum"] = {"Enum"}
 # list of tuples. First elem of tuple is the signature string,
 #  second is the comment string,
-#  third is a boolen which is True if the comment precedes the signature
+#  third is a boolean which is True if the comment precedes the signature
 signatures_with_comments: List[Tuple[str, str, bool]] = []
 for name, (prov_cls, value, locale) in unique_members.items():
     attr = getattr(prov_cls, name, None)
