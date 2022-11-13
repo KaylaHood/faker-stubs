@@ -30,12 +30,12 @@ def get_module_and_member(cls, locale = None) -> Tuple[str, str]:
     return module, member
 
 
-def get_members(cls: object) -> List[Tuple[str, Tuple[type, Any]]]:
+def get_members(cls: object, include_mangled: bool = False) -> List[Tuple[str, Tuple[type, Any]]]:
     members = [(name, (cls, value)) for (name, value) in inspect.getmembers(cls) 
-               if not name.startswith("_")]
+               if ((include_mangled and name.startswith("__")) or not name.startswith("_"))]
     return members
 
-classes_and_locales_to_use_for_stub: List[Tuple[object, str]] = [(faker.Faker, None)]
+classes_and_locales_to_use_for_stub: List[Tuple[object, str]] = []
 for locale in AVAILABLE_LOCALES:
     for provider in PROVIDERS:
         if provider == "faker.providers":
@@ -46,6 +46,8 @@ for locale in AVAILABLE_LOCALES:
 unique_members = {mbr[0]: (*mbr[1], locale) 
                   for cls, locale in classes_and_locales_to_use_for_stub 
                   for mbr in get_members(cls)}
+
+unique_members.update({mbr[0]: (*mbr[1], None) for mbr in get_members(faker.Faker, include_mangled=True)})
 
 imports = defaultdict(set)
 imports["typing"] = {"TypeVar"}
@@ -59,9 +61,8 @@ for name, (prov_cls, value, locale) in unique_members.items():
     if attr is not None and (inspect.isfunction(attr) or inspect.ismethod(attr)):
         sig = inspect.signature(value)
         comment = inspect.getdoc(value)
-        if (sig.return_annotation is not None 
-            and sig.return_annotation is not inspect.Signature.empty 
-            and sig.return_annotation.__module__ != "builtins"):
+        if (not sig.return_annotation in [None, inspect.Signature.empty, prov_cls.__name__]
+            and getattr(sig.return_annotation, "__module__", "") != "builtins"):
             module, member = get_module_and_member(sig.return_annotation, locale)
             if module is not None and member is not None:
                 imports[module].add(member)
