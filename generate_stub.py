@@ -9,8 +9,7 @@ from faker import Factory
 import faker.proxy
 
 BUILTIN_MODULES_TO_IGNORE = ["builtins"]
-GENERIC_MANGLE_TYPES_TO_IGNORE = ["builtin_function_or_method", "wrapper_descriptor", 
-                                  "method_descriptor", "mappingproxy", "getset_descriptor"]
+GENERIC_MANGLE_TYPES_TO_IGNORE = ["builtin_function_or_method", "mappingproxy"]
 
 
 def get_module_and_member(cls, locale = None) -> Tuple[str, str]:
@@ -48,7 +47,7 @@ class UniqueMemberFunctionsAndVariables:
         seen_funcs = seen_funcs.union(self.funcs.keys())
 
         self.vars = vars
-        for var_name in seen_vars:
+        for var_name in seen_vars.union(seen_funcs):
             self.vars.pop(var_name, None)
         seen_vars = seen_vars.union(self.vars.keys())
         
@@ -63,10 +62,11 @@ def get_member_functions_and_variables(cls: object, include_mangled: bool = Fals
         attr = getattr(cls, name, None)
         if attr is not None and (inspect.isfunction(attr) or inspect.ismethod(attr)):
             funcs[name] = value
-        else:
-            if (include_mangled and name.startswith("__") 
-                and type(value).__name__ in GENERIC_MANGLE_TYPES_TO_IGNORE):
-                continue
+        elif inspect.isgetsetdescriptor(attr) or inspect.ismethoddescriptor(attr):
+            # I haven't implemented logic
+            # for generating descriptor signatures yet
+            continue
+        elif not include_mangled or type(value).__name__ not in GENERIC_MANGLE_TYPES_TO_IGNORE:
             vars[name] = value
 
     return UniqueMemberFunctionsAndVariables(cls, funcs, vars)
