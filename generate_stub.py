@@ -8,6 +8,10 @@ from faker import Factory
 
 import faker.proxy
 
+BUILTIN_MODULES_TO_IGNORE = ["builtins"]
+GENERIC_MANGLE_TYPES_TO_IGNORE = ["builtin_function_or_method", "wrapper_descriptor", 
+                                  "method_descriptor", "mappingproxy", "getset_descriptor"]
+
 
 def get_module_and_member(cls, locale = None) -> Tuple[str, str]:
     cls_name = getattr(cls, '__name__', getattr(cls, '_name', str(cls)))
@@ -60,6 +64,9 @@ def get_member_functions_and_variables(cls: object, include_mangled: bool = Fals
         if attr is not None and (inspect.isfunction(attr) or inspect.ismethod(attr)):
             funcs[name] = value
         else:
+            if (include_mangled and name.startswith("__") 
+                and type(value).__name__ in GENERIC_MANGLE_TYPES_TO_IGNORE):
+                continue
             vars[name] = value
 
     return UniqueMemberFunctionsAndVariables(cls, funcs, vars)
@@ -97,7 +104,7 @@ for mbr_funcs_and_vars, locale in all_members:
         sig = inspect.signature(func_value)
         ret_annot_module = getattr(sig.return_annotation, "__module__", None)
         if (not sig.return_annotation in [None, inspect.Signature.empty, prov_cls.__name__]
-            and not ret_annot_module in [None, "builtins"]):
+            and not ret_annot_module in [None, *BUILTIN_MODULES_TO_IGNORE]):
             module, member = get_module_and_member(sig.return_annotation, locale)
             if module is not None and member is not None:
                 imports[module].add(member)
@@ -108,7 +115,7 @@ for mbr_funcs_and_vars, locale in all_members:
             if parm_val.default is not inspect.Parameter.empty:
                 new_parm = parm_val.replace(default=...)
             if (new_parm.annotation is not inspect.Parameter.empty 
-                and new_parm.annotation.__module__ != "builtins"):
+                and not new_parm.annotation.__module__ in BUILTIN_MODULES_TO_IGNORE):
                 module, member = get_module_and_member(new_parm.annotation, locale)
                 if module is not None and member is not None:
                     imports[module].add(member)
@@ -124,7 +131,7 @@ for mbr_funcs_and_vars, locale in all_members:
     for var_name, var_value in mbr_funcs_and_vars.vars.items():
         new_modules = []
         type_module = getattr(type(var_value), "__module__", None)
-        if type_module is not None and type_module != "builtins":
+        if type_module is not None and not type_module in BUILTIN_MODULES_TO_IGNORE:
             module, member = get_module_and_member(type(var_value), locale)
             if module is not None and member is not None:
                 imports[module].add(member)
