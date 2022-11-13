@@ -61,8 +61,9 @@ for name, (prov_cls, value, locale) in unique_members.items():
     if attr is not None and (inspect.isfunction(attr) or inspect.ismethod(attr)):
         sig = inspect.signature(value)
         comment = inspect.getdoc(value)
+        ret_annot_module = getattr(sig.return_annotation, "__module__", None)
         if (not sig.return_annotation in [None, inspect.Signature.empty, prov_cls.__name__]
-            and getattr(sig.return_annotation, "__module__", "") != "builtins"):
+            and not ret_annot_module in [None, "builtins"]):
             module, member = get_module_and_member(sig.return_annotation, locale)
             if module is not None and member is not None:
                 imports[module].add(member)
@@ -101,12 +102,14 @@ for sig, comment, is_preceding_comment in signatures_with_comments:
     if comment is not None and is_preceding_comment:
         signatures_with_comments_as_str.append(f"# {comment}\n    {sig}")
     elif comment is not None:
-        signatures_with_comments_as_str.append(sig + "\n    \"\"\"" + comment.replace("\n", "\n    ") + "\n    \"\"\"")
+        sig_without_final_ellipsis = sig.strip(" .")
+        signatures_with_comments_as_str.append(sig_without_final_ellipsis + "\n    \"\"\"\n    " 
+                                               + comment.replace("\n", "\n    ") + "\n    \"\"\"\n    ...")
     else:
         signatures_with_comments_as_str.append(sig)
 
 imports_block = "\n".join([f"from {module} import {', '.join(names)}" for module, names in imports.items()])
-member_signatures_block = "    " + "\n    ".join(signatures_with_comments_as_str)
+member_signatures_block = "    " + "\n    ".join([sig.replace("\n", "\n    ") for sig in signatures_with_comments_as_str])
 
 body = \
 f"""
